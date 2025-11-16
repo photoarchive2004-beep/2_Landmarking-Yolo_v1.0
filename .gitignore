@@ -1,0 +1,14 @@
+﻿# GM 2_Landmarking-YOLO: ignore local stuff and heavy artefacts
+/logs/
+/models/
+.venv*
+*.pth
+*.pt
+*.onnx
+*.zip
+*.rar
+*.7z
+*.bak
+tree_*.txt
+sync_*.log
+sync_repo*.log

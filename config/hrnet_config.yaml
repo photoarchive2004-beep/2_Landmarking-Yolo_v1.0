@@ -1,0 +1,19 @@
+﻿model_type: "hrnet_w32"
+
+# Максимальный размер длинной стороны (изображение вписывается в квадрат 1024x1024
+# без изменения пропорций рыбы; могут появиться чёрные поля по краям).
+input_size: 1024
+resize_mode: "resize"
+keep_aspect_ratio: true
+
+batch_size: 2
+learning_rate: 0.0005
+max_epochs: 100
+train_val_split: 0.9
+
+# ВАЖНО: рыба всегда в одной позе, флип выключен.
+flip_augmentation: false
+
+rotation_augmentation_deg: 15
+scale_augmentation: 0.3
+weight_decay: 0.0001
