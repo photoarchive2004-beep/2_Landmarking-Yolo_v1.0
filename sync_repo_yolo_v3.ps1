@@ -37,7 +37,7 @@ try {
         Write-Host "Origin already set correctly."
     }
 
-    # 3. Minimal .gitignore (не трогаем, если уже есть)
+    # 3. Minimal .gitignore (если файла нет — создаём базовый)
     $gitignorePath = Join-Path $root ".gitignore"
     if (!(Test-Path $gitignorePath)) {
 @"
@@ -85,17 +85,26 @@ Thumbs.db
         Write-Host "Nothing to commit, working tree clean."
     }
 
-    # 6. git push with output capture
+    # 6. git push with output capture (без падения PowerShell)
     Write-Host "=== git push origin main ==="
     $pushLog = Join-Path $logsDir "git_push_$stamp.log"
-    git push -u origin main 2>&1 | Tee-Object -FilePath $pushLog
+
+    # Запускаем через cmd.exe, чтобы git не превращался в TerminatingError,
+    # но код возврата всё равно попадает в $LASTEXITCODE.
+    $pushCmd = 'git push -u origin main'
+    cmd.exe /c $pushCmd 2>&1 | Tee-Object -FilePath $pushLog
+
     $pushExitCode = $LASTEXITCODE
     if ($pushExitCode -ne 0) {
         Write-Host "git push FAILED with exit code $pushExitCode" -ForegroundColor Red
+        Write-Host "Repository on GitHub is NOT up to date."
+        Write-Host "Please send this file to ChatGPT for analysis:"
+        Write-Host "  $pushLog"
     } else {
         Write-Host "git push succeeded."
         Write-Host "=== git ls-remote --heads origin ==="
         git ls-remote --heads origin | Tee-Object -FilePath (Join-Path $logsDir "git_lsremote_$stamp.log")
+        Write-Host "Repository on GitHub SHOULD be in sync with local 'main'."
     }
 
     Write-Host "Sync attempt completed. Log: $logFile"
