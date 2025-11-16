@@ -12,3 +12,21 @@
 tree_*.txt
 sync_*.log
 sync_repo*.log
+# --- auto-added by cleanup_yolo_repo_v2 ---
+.venv/
+.venv_*/
+env/
+venv/
+__pycache__/
+*.py[cod]
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+logs/
+logs/*.log
+logs/tree_*.txt
+logs/sync_*.log
+logs/sync_repo*.log
+datasets/
+experiments/
