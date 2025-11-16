@@ -5,7 +5,7 @@ chcp 65001 >nul
 rem ---- Paths ----
 set "HERE=%~dp0"
 for %%I in ("%HERE%\..\..") do set "ROOT=%%~fI"
-set "TOOL_DIR=%ROOT%\tools\2_Landmarking-Yolo_v1.0"
+set "TOOL_DIR=%ROOT%\tools\2_Landmarking_v1.0"
 set "PHOTOS_DIR=%ROOT%\photos"
 set "LOG_DIR=%TOOL_DIR%\logs"
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%" >nul 2>&1
@@ -135,6 +135,5 @@ if not "!RC!"=="0" (
 )
 
 exit /b 0
-
 
 

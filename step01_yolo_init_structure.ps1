@@ -1,4 +1,41 @@
-﻿from __future__ import annotations
+﻿param()
+
+$ErrorActionPreference = "Stop"
+
+$root = Get-Location
+Write-Host "=== step01_yolo_init_structure.ps1 ==="
+Write-Host "Root: $root"
+
+# 1) Патчим 1_ANNOTATOR.bat: привязываем к 2_Landmarking-Yolo_v1.0
+$annotPath = Join-Path $root "1_ANNOTATOR.bat"
+if (!(Test-Path $annotPath)) {
+    throw "1_ANNOTATOR.bat not found: $annotPath"
+}
+
+$stamp = Get-Date -Format "yyyyMMdd_HHmmss"
+
+$backupAnnot = Join-Path $root ("1_ANNOTATOR.bat.bak_" + $stamp)
+Copy-Item $annotPath $backupAnnot -Force
+Write-Host "Backup of 1_ANNOTATOR.bat -> $backupAnnot"
+
+$annotText = Get-Content $annotPath -Raw -Encoding UTF8
+$annotText = $annotText -replace "2_Landmarking_v1.0","2_Landmarking-Yolo_v1.0"
+Set-Content -Path $annotPath -Value $annotText -Encoding UTF8
+Write-Host "Patched TOOL_DIR in 1_ANNOTATOR.bat to 2_Landmarking-Yolo_v1.0"
+
+# 2) Переписываем scripts\init_structure.py под YOLO
+$initPath = Join-Path $root "scripts\init_structure.py"
+if (!(Test-Path $initPath)) {
+    throw "scripts\init_structure.py not found: $initPath"
+}
+
+$backupInit = Join-Path $root ("scripts\init_structure.py.bak_" + $stamp)
+Copy-Item $initPath $backupInit -Force
+Write-Host "Backup of init_structure.py -> $backupInit"
+
+# ВНИМАНИЕ: это уже содержимое самого init_structure.py
+$initCode = @"
+from __future__ import annotations
 
 from pathlib import Path
 
@@ -136,3 +173,19 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+"@
+
+Set-Content -Path $initPath -Value $initCode -Encoding UTF8
+Write-Host "Rewritten scripts\init_structure.py for YOLO config."
+
+# 3) Синхронизация с GitHub (по ТЗ)
+$syncScript = Join-Path $root "sync_repo_yolo_v3.ps1"
+if (Test-Path $syncScript) {
+    Write-Host "Running sync_repo_yolo_v3.ps1 ..."
+    powershell -NoProfile -ExecutionPolicy Bypass -File $syncScript
+}
+else {
+    Write-Host "[WARN] sync_repo_yolo_v3.ps1 not found, skipping auto git sync."
+}
+
+Write-Host "=== step01_yolo_init_structure.ps1 done ==="
