@@ -118,20 +118,18 @@ def infer_locality(root: Path, base_localities: Path, locality_name: str) -> int
             _log("Pillow (PIL) is not installed.", log_file)
             return 1
 
-        # Конфиг YOLO
+        # Загружаем конфиг YOLO
         cfg = _load_yolo_config(root)
-        model_cfg = cfg.get("model", {}) if isinstance(cfg, dict) else {}
-        infer_cfg = cfg.get("infer", {}) if isinstance(cfg, dict) else {}
+        model_cfg = cfg.get("model", {}) or {}
+        resize_cfg = cfg.get("resize", {}) or {}
+        infer_cfg = cfg.get("infer", {}) or {}
 
-        # Число ключевых точек:
-        #  1) сначала LM_number.txt,
-        #  2) если 0 — num_keypoints из конфига.
+        # Число ключевых точек: сначала LM_number.txt, затем num_keypoints из конфига
         n_kpts_from_lm = _read_lm_number(root)
         try:
             n_kpts_from_cfg = int(model_cfg.get("num_keypoints") or 0)
         except Exception:
             n_kpts_from_cfg = 0
-
         num_keypoints = n_kpts_from_lm or n_kpts_from_cfg
         if num_keypoints <= 0:
             _log(
@@ -140,6 +138,14 @@ def infer_locality(root: Path, base_localities: Path, locality_name: str) -> int
                 log_file,
             )
             return 1
+
+        # Размер для инференса: long_side из секции resize
+        try:
+            img_long_side = int(resize_cfg.get("long_side", 1280) or 1280)
+        except Exception:
+            img_long_side = 1280
+        if img_long_side < 640:
+            img_long_side = 640
 
         quality = _load_quality(root)
         run_id = str(quality.get("run_id", ""))
@@ -157,6 +163,7 @@ def infer_locality(root: Path, base_localities: Path, locality_name: str) -> int
         device = "cuda" if (torch is not None and torch.cuda.is_available()) else "cpu"
         _log(f"Loading YOLO model from {model_path}", log_file)
         _log(f"Using device: {device}", log_file)
+        _log(f"Inference long_side (imgsz) = {img_long_side}", log_file)
 
         model = YOLO(str(model_path))
 
@@ -185,6 +192,7 @@ def infer_locality(root: Path, base_localities: Path, locality_name: str) -> int
                     device=device,
                     conf=conf_thres,
                     iou=iou_thres,
+                    imgsz=img_long_side,
                     verbose=False,
                 )
             except Exception as exc:
