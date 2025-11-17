@@ -270,11 +270,60 @@ def run_train_yolo(root: Path, base_localities: Path, localities: List[LocalityS
 
 def run_autolabel_yolo(root: Path, base_localities: Path, localities: List[LocalityStatus]) -> None:
     """
-    Placeholder for YOLO autolabel.
+    Action 2) Autolabel locality with current YOLO model.
+
+    Uses models/current/yolo_best.pt and models/current/quality.json
+    to label a selected locality and update status/localities_status.csv.
     """
+    # Проверяем наличие обученной модели
+    model_path = root / "models" / "current" / "yolo_best.pt"
+    quality_path = root / QUALITY_FILE
+
+    if not model_path.is_file() or not quality_path.is_file():
+        print("No trained YOLO model found in models/current/.")
+        print("Please run action 1) Train / finetune YOLO model first.")
+        return
+
+    loc = pick_locality(localities)
+    if loc is None:
+        return
+
+    script = root / "scripts" / "infer_yolo.py"
+    if not script.is_file():
+        print(f"[ERR] YOLO inference script not found: {script}")
+        return
+
+    py = os.environ.get("PYTHON_EXE") or sys.executable or "python"
+
+    env = os.environ.copy()
+    env["LM_ROOT"] = str(root)
+    env["BASE_LOCALITIES"] = str(base_localities)
+
+    cmd = [
+        str(py),
+        str(script),
+        "--root",
+        str(root),
+        "--base",
+        str(base_localities),
+        "--locality",
+        loc.name,
+    ]
+
     print()
-    print("[INFO] YOLO autolabel (action 2) is not implemented yet in this step.")
-    print("       Autolabeling will be available after training code is added.")
+    print(f"[INFO] Starting YOLO autolabel for locality '{loc.name}' via {script.name} ...")
+    print()
+
+    try:
+        result = subprocess.run(cmd, env=env)
+    except Exception as exc:
+        print(f"[ERR] Cannot start infer_yolo.py: {exc}")
+        return
+
+    if result.returncode != 0:
+        print(f"[ERR] YOLO autolabel script finished with code {result.returncode}.")
+    else:
+        print("[INFO] YOLO autolabel finished successfully.")
     print()
 
 
@@ -396,4 +445,3 @@ if __name__ == "__main__":
         print(f"[ERR] Trainer crashed: {exc}")
         code = 1
     raise SystemExit(code)
-
