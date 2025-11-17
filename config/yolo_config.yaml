@@ -1,0 +1,32 @@
+# YOLO pose config for GM Landmarking (auto-created)
+model:
+  pretrained_weights: "yolov8m-pose.pt"
+  num_keypoints: 17
+  class_names: ["class"]
+
+resize:
+  enabled: true
+  long_side: 1280
+  stride_multiple: 32
+
+train:
+  train_val_split: 0.9
+  max_epochs: 100
+  batch_size: 8
+  learning_rate: 0.0005
+  weight_decay: 0.0001
+
+augment:
+  rotation_deg: 15
+  rotation_prob: 0.5
+  scale_min: 0.8
+  scale_max: 1.25
+  scale_prob: 0.5
+  brightness: 0.1
+  contrast: 0.1
+  color_prob: 0.5
+  horizontal_flip: false
+
+infer:
+  conf_threshold: 0.25
+  iou_threshold: 0.5

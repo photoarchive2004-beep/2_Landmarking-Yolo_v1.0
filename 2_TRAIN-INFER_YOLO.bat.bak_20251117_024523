@@ -1,4 +1,4 @@
-@echo off
+я╗┐@echo off
 setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 
@@ -21,20 +21,17 @@ rem 2) Read cfg\last_base.txt -> BASE_LOCALITIES
 set "CFG_DIR=%LM_ROOT%\cfg"
 set "LAST_BASE=%CFG_DIR%\last_base.txt"
 set "BASE_LOCALITIES="
+if exist "%LAST_BASE%" (
+    set /p BASE_LOCALITIES=<"%LAST_BASE%"
+)
 
-if not exist "%LAST_BASE%" goto NoBase
-set /p BASE_LOCALITIES=<"%LAST_BASE%"
-if not defined BASE_LOCALITIES goto NoBase
+if not defined BASE_LOCALITIES (
+    echo [ERR] Base localities not selected (cfg\last_base.txt missing).>>"%LOG_DIR%\trainer_menu_last.log"
+    echo [ERR] Base localities not selected. Please run 1_ANNOTATOR.bat first.
+    pause
+    exit /b 1
+)
 
-goto HaveBase
-
-:NoBase
-echo [ERR] Base localities not selected (cfg\last_base.txt missing or empty).>>"%LOG_DIR%\trainer_menu_last.log"
-echo [ERR] Base localities not selected. Please run 1_ANNOTATOR.bat first.
-pause
-exit /b 1
-
-:HaveBase
 rem 3) Python from local venv
 set "PY=%LM_ROOT%\.venv_lm\Scripts\python.exe"
 if not exist "%PY%" (
@@ -52,8 +49,8 @@ rem 4) init_structure + rebuild_localities_status
 "%PY%" "%LM_ROOT%\scripts\init_structure.py" 1>>"%LOG_DIR%\init_trainer_last.log" 2>&1
 "%PY%" "%LM_ROOT%\scripts\rebuild_localities_status.py" 1>>"%LOG_DIR%\status_trainer_last.log" 2>&1
 
-rem 5) Run trainer menu (interactive, без редиректа)
+rem 5) Run trainer menu (keeps console open until user chooses 0)
 set "GM_BASE_LOCALITIES=%BASE_LOCALITIES%"
-"%PY%" "%LM_ROOT%\scripts\trainer_menu.py" --base-localities "%BASE_LOCALITIES%"
+"%PY%" "%LM_ROOT%\scripts\trainer_menu.py" --base-localities "%BASE_LOCALITIES%" 1>>"%LOG_DIR%\trainer_menu_last.log" 2>&1
 
 endlocal
