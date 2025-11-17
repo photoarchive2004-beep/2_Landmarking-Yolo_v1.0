@@ -1,0 +1,59 @@
+@echo off
+setlocal EnableExtensions EnableDelayedExpansion
+chcp 65001 >nul
+
+rem === GM Landmarking: YOLO Trainer (v1.0) ===
+
+rem Landmarking-YOLO module root (LM_ROOT)
+set "LM_ROOT=%~dp0"
+for %%I in ("%LM_ROOT%") do set "LM_ROOT=%%~fI"
+
+set "LOG_DIR=%LM_ROOT%\logs"
+if not exist "%LOG_DIR%" mkdir "%LOG_DIR%" >nul 2>&1
+
+rem 1) Ask for base_localities via Windows dialog
+powershell -NoProfile -ExecutionPolicy Bypass -File "%LM_ROOT%\scripts\choose_localities.ps1"
+if errorlevel 1 (
+    echo [WARN] Localities base picker failed or was cancelled.>>"%LOG_DIR%\trainer_menu_last.log"
+)
+
+rem 2) Read cfg\last_base.txt -> BASE_LOCALITIES
+set "CFG_DIR=%LM_ROOT%\cfg"
+set "LAST_BASE=%CFG_DIR%\last_base.txt"
+set "BASE_LOCALITIES="
+
+if not exist "%LAST_BASE%" goto NoBase
+set /p BASE_LOCALITIES=<"%LAST_BASE%"
+if not defined BASE_LOCALITIES goto NoBase
+
+goto HaveBase
+
+:NoBase
+echo [ERR] Base localities not selected (cfg\last_base.txt missing or empty).>>"%LOG_DIR%\trainer_menu_last.log"
+echo [ERR] Base localities not selected. Please run 1_ANNOTATOR.bat first.
+pause
+exit /b 1
+
+:HaveBase
+rem 3) Python from local venv
+set "PY=%LM_ROOT%\.venv_lm\Scripts\python.exe"
+if not exist "%PY%" (
+    echo [ERR] Landmarking YOLO environment not found: "%PY%">>"%LOG_DIR%\trainer_menu_last.log"
+    echo [ERR] Landmarking YOLO environment not found: "%PY%"
+    echo Run 0_INSTALL_ENV.ps1 in the module root.
+    pause
+    exit /b 1
+)
+
+title === GM Landmarking: YOLO Trainer (v1.0) ===
+echo === GM Landmarking: YOLO Trainer (v1.0) ===
+
+rem 4) init_structure + rebuild_localities_status
+"%PY%" "%LM_ROOT%\scripts\init_structure.py" 1>>"%LOG_DIR%\init_trainer_last.log" 2>&1
+"%PY%" "%LM_ROOT%\scripts\rebuild_localities_status.py" 1>>"%LOG_DIR%\status_trainer_last.log" 2>&1
+
+rem 5) Run trainer menu (interactive, без редиректа)
+set "GM_BASE_LOCALITIES=%BASE_LOCALITIES%"
+"%PY%" "%LM_ROOT%\scripts\trainer_menu.py" --base-localities "%BASE_LOCALITIES%"
+
+endlocal
