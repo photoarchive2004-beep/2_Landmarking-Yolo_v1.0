@@ -590,8 +590,14 @@ def train_yolo(root: Path, base: Path) -> int:
         history_run_dir = history_root / run_id
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        _log(f"Creating YOLO model from weights: {cfg.model.pretrained_weights}", log_file)
-        _log(f"Using device: {device}", log_file)
+        _log(
+            f"Creating YOLO model from weights: {cfg.model.pretrained_weights}",
+            log_file,
+        )
+        _log(
+            f"Using device: {device} (torch.cuda.is_available={torch.cuda.is_available()})",
+            log_file,
+        )
 
         model = YOLO(str(cfg.model.pretrained_weights))
 
@@ -613,9 +619,22 @@ def train_yolo(root: Path, base: Path) -> int:
         try:
             model.train(**train_args)
         except Exception as exc:
-            _log(f"[ERR] YOLO training failed: {exc}", log_file)
-            log_file.close()
-            return 1
+            # Если попытались тренировать на CUDA и что-то пошло не так — пробуем ещё раз на CPU.
+            if device == "cuda":
+                _log(f"[WARN] YOLO training on CUDA failed: {exc}. Falling back to CPU.", log_file)
+                device = "cpu"
+                train_args["device"] = device
+                _log(f"Restarting YOLO training on device: {device}", log_file)
+                try:
+                    model.train(**train_args)
+                except Exception as exc2:
+                    _log(f"[ERR] YOLO training failed on CPU: {exc2}", log_file)
+                    log_file.close()
+                    return 1
+            else:
+                _log(f"[ERR] YOLO training failed: {exc}", log_file)
+                log_file.close()
+                return 1
 
         # Ищем лучший чекпоинт
         weights_dir = history_run_dir / "weights"
@@ -787,3 +806,4 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
