@@ -78,6 +78,7 @@ class YoloTrainConfig:
     batch_size: int = 8
     learning_rate: float = 5e-4
     weight_decay: float = 1e-4
+    early_stop_patience: int = 10
 
 
 @dataclass
@@ -146,8 +147,14 @@ def _load_yolo_config(root: Path, log_file: Any) -> YoloConfig:
         stride_multiple=int(resize_data.get("stride_multiple", 32)),
     )
 
-    train_cfg = YoloTrainConfig(
-        train_val_split=float(train_data.get("train_val_split", 0.9)),
+            train_cfg = YoloTrainConfig(
+            train_val_split=float(train_data.get("train_val_split", 0.9)),
+            max_epochs=int(train_data.get("max_epochs", 100)),
+            batch_size=int(train_data.get("batch_size", 8)),
+            learning_rate=float(train_data.get("learning_rate", 5e-4)),
+            weight_decay=float(train_data.get("weight_decay", 1e-4)),
+            early_stop_patience=int(train_data.get("early_stop_patience", 10)),
+        )),
         max_epochs=int(train_data.get("max_epochs", 100)),
         batch_size=int(train_data.get("batch_size", 8)),
         learning_rate=float(train_data.get("learning_rate", 5e-4)),
@@ -590,16 +597,22 @@ def train_yolo(root: Path, base: Path) -> int:
         history_run_dir = history_root / run_id
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        _log(
-            f"Creating YOLO model from weights: {cfg.model.pretrained_weights}",
-            log_file,
-        )
-        _log(
-            f"Using device: {device} (torch.cuda.is_available={torch.cuda.is_available()})",
-            log_file,
-        )
 
-        model = YOLO(str(cfg.model.pretrained_weights))
+        # Если есть уже обученная модель в models/current/yolo_best.pt,
+        # продолжаем обучение от неё, иначе используем базовые веса из конфига.
+        current_best = root / "models" / "current" / "yolo_best.pt"
+        if current_best.is_file():
+            pretrained_path = current_best
+            _log(f"Found existing model in models/current: {pretrained_path}", log_file)
+        else:
+            pretrained_path = Path(cfg.model.pretrained_weights)
+            if not pretrained_path.is_absolute():
+                pretrained_path = root / pretrained_path
+            _log(f"Using pretrained weights from config: {pretrained_path}", log_file)
+
+        _log(f"Using device: {device}", log_file)
+
+        model = YOLO(str(pretrained_path))
 
         train_args: Dict[str, Any] = {
             "data": str(ds_root / "dataset.yaml"),
@@ -612,8 +625,11 @@ def train_yolo(root: Path, base: Path) -> int:
             "name": run_id,
             "exist_ok": True,
             "verbose": True,
-            "device": device,
+            ""device"": device,
         }
+
+        if getattr(cfg.train, ""early_stop_patience"", 0) > 0:
+            train_args[""patience""] = int(cfg.train.early_stop_patience)
 
         _log(f"Starting YOLO training with args: {train_args}", log_file)
         try:
@@ -806,4 +822,5 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
 
