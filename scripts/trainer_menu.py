@@ -223,17 +223,46 @@ def show_model_info(root: Path) -> None:
 
 def run_train_yolo(root: Path, base_localities: Path, localities: List[LocalityStatus]) -> None:
     """
-    Placeholder for YOLO training.
-    В этом шаге только заглушка — чтобы меню и статусы работали.
+    Action 1) Train / finetune YOLO model on MANUAL localities.
+
+    According to ТЗ-YOLO:
+      - use only MANUAL localities from status/localities_status.csv
+      - build YOLO-pose dataset in datasets/yolo/<run_id>/
+      - call scripts/train_yolo.py which trains model and computes PCK@R
     """
     manual_localities = [loc for loc in localities if loc.status.upper() == "MANUAL"]
     if not manual_localities:
         print("No MANUAL localities. Nothing to train.")
         return
 
+    script = root / "scripts" / "train_yolo.py"
+    if not script.is_file():
+        print(f"[ERR] YOLO training script not found: {script}")
+        return
+
+    # Python executable (prefer same env as this script)
+    py = os.environ.get("PYTHON_EXE") or sys.executable or "python"
+
+    env = os.environ.copy()
+    env["LM_ROOT"] = str(root)
+    env["BASE_LOCALITIES"] = str(base_localities)
+
+    cmd = [str(py), str(script), "--root", str(root), "--base", str(base_localities)]
+
     print()
-    print("[INFO] YOLO training pipeline is not implemented yet in this step.")
-    print("       Trainer is wired and will be implemented in the next steps.")
+    print(f"[INFO] Starting YOLO training via {script.name} ...")
+    print()
+
+    try:
+        result = subprocess.run(cmd, env=env)
+    except Exception as exc:
+        print(f"[ERR] Cannot start train_yolo.py: {exc}")
+        return
+
+    if result.returncode != 0:
+        print(f"[ERR] YOLO training script finished with code {result.returncode}.")
+    else:
+        print("[INFO] YOLO training finished successfully.")
     print()
 
 
@@ -365,3 +394,4 @@ if __name__ == "__main__":
         print(f"[ERR] Trainer crashed: {exc}")
         code = 1
     raise SystemExit(code)
+
