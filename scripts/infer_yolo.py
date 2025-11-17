@@ -39,7 +39,7 @@ def _log(msg: str, fh) -> None:
     line = f"[{ts}] {msg}"
     print(line)
     if fh is not None:
-        fh.write(line + "\\n")
+        fh.write(line + "\n")
         fh.flush()
 
 
@@ -123,18 +123,16 @@ def infer_locality(root: Path, base_localities: Path, locality_name: str) -> int
         model_cfg = cfg.get("model", {}) if isinstance(cfg, dict) else {}
         infer_cfg = cfg.get("infer", {}) if isinstance(cfg, dict) else {}
 
-        # Читаем количество ключевых точек:
-        #   1) сначала LM_number.txt,
-        #   2) если там 0 — num_keypoints из конфигурации.
+        # Число ключевых точек:
+        #  1) сначала LM_number.txt,
+        #  2) если 0 — num_keypoints из конфига.
         n_kpts_from_lm = _read_lm_number(root)
-        n_kpts_from_cfg = 0
         try:
             n_kpts_from_cfg = int(model_cfg.get("num_keypoints") or 0)
         except Exception:
             n_kpts_from_cfg = 0
 
         num_keypoints = n_kpts_from_lm or n_kpts_from_cfg
-
         if num_keypoints <= 0:
             _log(
                 "Number of keypoints is not defined. "
@@ -228,7 +226,7 @@ def infer_locality(root: Path, base_localities: Path, locality_name: str) -> int
 
             out_csv = img_path.with_suffix(".csv")
             row = ",".join(f"{v:.3f}" if v != -1.0 else "-1" for v in coords)
-            out_csv.write_text(row + "\\n", encoding="utf-8")
+            out_csv.write_text(row + "\n", encoding="utf-8")
             n_labeled += 1
             _log(f"Wrote landmarks CSV: {out_csv.name}", log_file)
 
