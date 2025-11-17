@@ -34,45 +34,54 @@ QUALITY_FILE = "models/current/quality.json"
 YOLO_CONFIG = "config/yolo_config.yaml"
 
 
-def get_root(arg_root: str | None) -> Path:
-    if arg_root:
-        return Path(arg_root).resolve()
-    return Path(__file__).resolve().parent.parent
-
-
 def _log(msg: str, fh) -> None:
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     line = f"[{ts}] {msg}"
     print(line)
     if fh is not None:
-        fh.write(line + "\n")
+        fh.write(line + "\\n")
         fh.flush()
+
+
+def _get_root(arg_root: str | None) -> Path:
+    if arg_root:
+        return Path(arg_root).resolve()
+    return Path(__file__).resolve().parent.parent
+
+
+def _read_lm_number(root: Path) -> int:
+    """Читаем LM_number.txt; если нет/ошибка — возвращаем 0."""
+    lm_path = root / "LM_number.txt"
+    if not lm_path.is_file():
+        return 0
+    try:
+        text = lm_path.read_text(encoding="utf-8").strip()
+        return int(text)
+    except Exception:
+        return 0
 
 
 def _load_yolo_config(root: Path) -> Dict[str, Any]:
     cfg_path = root / YOLO_CONFIG
-    if not cfg_path.exists() or yaml is None:
-        return {}
-    try:
-        with cfg_path.open("r", encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
-        if not isinstance(data, dict):
-            return {}
-        return data
-    except Exception:
-        return {}
+    if yaml is None:
+        raise RuntimeError("PyYAML is not installed, cannot read yolo_config.yaml")
+    if not cfg_path.is_file():
+        raise RuntimeError(f"YOLO config not found: {cfg_path}")
+    with cfg_path.open("r", encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    if not isinstance(data, dict):
+        raise RuntimeError("Invalid structure in yolo_config.yaml")
+    return data
 
 
 def _load_quality(root: Path) -> Dict[str, Any]:
     q_path = root / QUALITY_FILE
-    if not q_path.exists():
+    if not q_path.is_file():
         return {}
     try:
         with q_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
-        if not isinstance(data, dict):
-            return {}
-        return data
+        return data if isinstance(data, dict) else {}
     except Exception:
         return {}
 
@@ -109,12 +118,29 @@ def infer_locality(root: Path, base_localities: Path, locality_name: str) -> int
             _log("Pillow (PIL) is not installed.", log_file)
             return 1
 
+        # Конфиг YOLO
         cfg = _load_yolo_config(root)
         model_cfg = cfg.get("model", {}) if isinstance(cfg, dict) else {}
         infer_cfg = cfg.get("infer", {}) if isinstance(cfg, dict) else {}
-        num_keypoints = int(model_cfg.get("num_keypoints", 0) or 0)
+
+        # Читаем количество ключевых точек:
+        #   1) сначала LM_number.txt,
+        #   2) если там 0 — num_keypoints из конфигурации.
+        n_kpts_from_lm = _read_lm_number(root)
+        n_kpts_from_cfg = 0
+        try:
+            n_kpts_from_cfg = int(model_cfg.get("num_keypoints") or 0)
+        except Exception:
+            n_kpts_from_cfg = 0
+
+        num_keypoints = n_kpts_from_lm or n_kpts_from_cfg
+
         if num_keypoints <= 0:
-            _log("num_keypoints is not configured in config/yolo_config.yaml.", log_file)
+            _log(
+                "Number of keypoints is not defined. "
+                "Please set LM_number.txt and/or model.num_keypoints in config/yolo_config.yaml.",
+                log_file,
+            )
             return 1
 
         quality = _load_quality(root)
@@ -130,7 +156,7 @@ def infer_locality(root: Path, base_localities: Path, locality_name: str) -> int
             _log(f"Model file not found: {model_path}", log_file)
             return 1
 
-        device = "cuda" if (torch.cuda.is_available() if torch is not None else False) else "cpu"
+        device = "cuda" if (torch is not None and torch.cuda.is_available()) else "cpu"
         _log(f"Loading YOLO model from {model_path}", log_file)
         _log(f"Using device: {device}", log_file)
 
@@ -154,7 +180,7 @@ def infer_locality(root: Path, base_localities: Path, locality_name: str) -> int
 
         n_labeled = 0
         for img_path in image_paths:
-            _log(f"Processing image: {img_path}", log_file)
+            _log(f"Processing image: {img_path.name}", log_file)
             try:
                 results = model(
                     str(img_path),
@@ -185,8 +211,7 @@ def infer_locality(root: Path, base_localities: Path, locality_name: str) -> int
             if pts.shape[0] != num_keypoints:
                 _log(
                     f"[WARN] Predicted {pts.shape[0]} keypoints, "
-                    f"but config expects {num_keypoints}. "
-                    "Will truncate / pad with -1,-1.",
+                    f"but expected {num_keypoints}. Will truncate/pad with -1.",
                     log_file,
                 )
 
@@ -203,7 +228,7 @@ def infer_locality(root: Path, base_localities: Path, locality_name: str) -> int
 
             out_csv = img_path.with_suffix(".csv")
             row = ",".join(f"{v:.3f}" if v != -1.0 else "-1" for v in coords)
-            out_csv.write_text(row + "\n", encoding="utf-8")
+            out_csv.write_text(row + "\\n", encoding="utf-8")
             n_labeled += 1
             _log(f"Wrote landmarks CSV: {out_csv.name}", log_file)
 
@@ -253,7 +278,7 @@ def main() -> int:
     parser.add_argument("--locality", dest="locality", required=True)
     args = parser.parse_args()
 
-    root = get_root(args.root)
+    root = _get_root(args.root)
     if args.base:
         base_localities = Path(args.base)
     else:
