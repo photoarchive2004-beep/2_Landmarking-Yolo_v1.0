@@ -119,12 +119,16 @@ def _load_yolo_config(root: Path, log_file: Any) -> YoloConfig:
     with cfg_path.open("r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
 
+    if not isinstance(data, dict):
+        raise RuntimeError("Invalid structure in yolo_config.yaml")
+
     model_data = data.get("model", {}) or {}
     resize_data = data.get("resize", {}) or {}
     train_data = data.get("train", {}) or {}
     augment_data = data.get("augment", {}) or {}
     infer_data = data.get("infer", {}) or {}
 
+    # Число ключевых точек: сначала LM_number.txt, затем model.num_keypoints
     n_kpts_from_file = int(model_data.get("num_keypoints") or 0)
     n_kpts_from_lm = _read_lm_number(root)
     num_keypoints = n_kpts_from_lm or n_kpts_from_file
@@ -147,24 +151,21 @@ def _load_yolo_config(root: Path, log_file: Any) -> YoloConfig:
         stride_multiple=int(resize_data.get("stride_multiple", 32)),
     )
 
-            train_cfg = YoloTrainConfig(
-            train_val_split=float(train_data.get("train_val_split", 0.9)),
-            max_epochs=int(train_data.get("max_epochs", 100)),
-            batch_size=int(train_data.get("batch_size", 8)),
-            learning_rate=float(train_data.get("learning_rate", 5e-4)),
-            weight_decay=float(train_data.get("weight_decay", 1e-4)),
-            early_stop_patience=int(train_data.get("early_stop_patience", 10)),
-        )),
+    train_cfg = YoloTrainConfig(
+        train_val_split=float(train_data.get("train_val_split", 0.9)),
         max_epochs=int(train_data.get("max_epochs", 100)),
         batch_size=int(train_data.get("batch_size", 8)),
         learning_rate=float(train_data.get("learning_rate", 5e-4)),
         weight_decay=float(train_data.get("weight_decay", 1e-4)),
+        early_stop_patience=int(train_data.get("early_stop_patience", 10)),
     )
 
     _log(
         f"YOLO config: num_keypoints={model_cfg.num_keypoints}, "
         f"pretrained_weights={model_cfg.pretrained_weights}, "
-        f"resize.enabled={resize_cfg.enabled}, resize.long_side={resize_cfg.long_side}",
+        f"resize.enabled={resize_cfg.enabled}, resize.long_side={resize_cfg.long_side}, "
+        f"train.max_epochs={train_cfg.max_epochs}, train.batch_size={train_cfg.batch_size}, "
+        f"train.early_stop_patience={train_cfg.early_stop_patience}",
         log_file,
     )
 
@@ -175,7 +176,6 @@ def _load_yolo_config(root: Path, log_file: Any) -> YoloConfig:
         augment=augment_data,
         infer=infer_data,
     )
-
 
 # -----------------------------
 # Чтение статусов и выбор MANUAL
@@ -625,11 +625,11 @@ def train_yolo(root: Path, base: Path) -> int:
             "name": run_id,
             "exist_ok": True,
             "verbose": True,
-            ""device"": device,
+            "device": device,
         }
 
-        if getattr(cfg.train, ""early_stop_patience"", 0) > 0:
-            train_args[""patience""] = int(cfg.train.early_stop_patience)
+        if getattr(cfg.train, "early_stop_patience", 0) > 0:
+            train_args["patience"] = int(cfg.train.early_stop_patience)
 
         _log(f"Starting YOLO training with args: {train_args}", log_file)
         try:
