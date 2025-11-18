@@ -213,7 +213,20 @@ def infer_locality(root: Path, base_localities: Path, locality_name: str) -> int
                 _log(f"[WARN] Empty keypoints tensor for {img_path.name}", log_file)
                 continue
 
-            pts = k_xy[0]
+            best_idx = 0
+            try:
+                boxes = getattr(r, "boxes", None)
+                if boxes is not None and getattr(boxes, "conf", None) is not None:
+                    confs = boxes.conf
+                    if confs is not None and len(confs) > 0:
+                        best_idx = int(confs.argmax().item())
+            except Exception:
+                best_idx = 0
+
+            if best_idx >= len(k_xy):
+                best_idx = 0
+
+            pts = k_xy[best_idx]
             if pts.shape[0] != num_keypoints:
                 _log(
                     f"[WARN] Predicted {pts.shape[0]} keypoints, "
@@ -301,3 +314,4 @@ def main() -> int:
 if __name__ == "__main__":
     exit_code = main()
     raise SystemExit(exit_code)
+
