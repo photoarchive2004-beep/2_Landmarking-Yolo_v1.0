@@ -213,13 +213,35 @@ def infer_locality(root: Path, base_localities: Path, locality_name: str) -> int
                 _log(f"[WARN] Empty keypoints tensor for {img_path.name}", log_file)
                 continue
 
+            # Choose best detection: prefer the one with the longest keypoint span along X.
+            # This effectively ignores YOLO boxes and is better when there is always a single fish per image.
             best_idx = 0
             try:
-                boxes = getattr(r, "boxes", None)
-                if boxes is not None and getattr(boxes, "conf", None) is not None:
-                    confs = boxes.conf
-                    if confs is not None and len(confs) > 0:
-                        best_idx = int(confs.argmax().item())
+                n_det = len(k_xy)
+                if n_det > 1:
+                    spans = []
+                    for i in range(n_det):
+                        pts_i = k_xy[i]
+                        try:
+                            # pts_i is a tensor-like [num_keypoints, 2]
+                            xs = pts_i[:, 0]
+                            # Use only finite X coordinates (drop NaN/Inf if any)
+                            if hasattr(xs, "isfinite"):
+                                mask = xs.isfinite()
+                                xs_valid = xs[mask]
+                            else:
+                                xs_valid = xs
+                            if xs_valid is not None and len(xs_valid) > 0:
+                                span = float(xs_valid.max().item() - xs_valid.min().item())
+                            else:
+                                span = 0.0
+                        except Exception:
+                            span = 0.0
+                        spans.append(span)
+                    if spans:
+                        best_idx = int(max(range(len(spans)), key=lambda i: spans[i]))
+                else:
+                    best_idx = 0
             except Exception:
                 best_idx = 0
 
@@ -314,4 +336,5 @@ def main() -> int:
 if __name__ == "__main__":
     exit_code = main()
     raise SystemExit(exit_code)
+
 
