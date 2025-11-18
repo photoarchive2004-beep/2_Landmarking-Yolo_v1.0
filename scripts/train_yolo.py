@@ -628,6 +628,12 @@ def train_yolo(root: Path, base: Path) -> int:
             "device": device,
         }
 
+        # Apply custom loss weights from config["augment"] (loss_* keys)
+        train_args["box"]  = float(cfg.augment.get("loss_box", 7.5))
+        train_args["cls"]  = float(cfg.augment.get("loss_cls", 0.5))
+        train_args["dfl"]  = float(cfg.augment.get("loss_dfl", 1.5))
+        train_args["pose"] = float(cfg.augment.get("loss_pose", 12.0))
+        train_args["kobj"] = float(cfg.augment.get("loss_kobj", 2.0))
         if getattr(cfg.train, "early_stop_patience", 0) > 0:
             train_args["patience"] = int(cfg.train.early_stop_patience)
 
@@ -822,5 +828,6 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
 
 
